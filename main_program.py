@@ -6,14 +6,13 @@ import os
 import ttkbootstrap as ttk
 from ttkbootstrap import Style
 
-
 class Application(ttk.Window):
     def __init__(self):
         super().__init__()
-        style = Style(theme='minty')  # ttkbootstrap 스타일 적용
-
+        style = Style(theme='minty')
         self.title("인생한컷")
         self.geometry("1280x720")
+
         self.frames = {}
 
         container = tk.Frame(self)
@@ -21,7 +20,7 @@ class Application(ttk.Window):
         container.grid_rowconfigure(0, weight=1)
         container.grid_columnconfigure(0, weight=1)
 
-        for F in (StartPage, ReadyPage, ConfirmationPage, PhotoPage, PoseRecommandPage):
+        for F in (StartPage, ReadyPage, ConfirmationPage, PhotoPage, PoseRecommandPage, SelectionPage):
             frame = F(container, self)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky="nsew")
@@ -31,6 +30,8 @@ class Application(ttk.Window):
     def show_frame(self, cont):
         frame = self.frames[cont]
         frame.tkraise()
+        if hasattr(frame, "on_show_frame"):
+            frame.on_show_frame() # 페이지가 화면에 표시될 때 특정 동작 수행
 
 
 class StartPage(tk.Frame):
@@ -48,13 +49,13 @@ class StartPage(tk.Frame):
 class ReadyPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
-
+        self.controller = controller
         # 라벨에 큰 글꼴 크기 지정 및 중앙 배치
         self.label = tk.Label(self, text="인식중입니다. 5", font=("Helvetica", 20))
         self.label.pack(expand=True)
 
-        # 카운트다운 시작
-        self.countdown(6, controller)
+    def on_show_frame(self):
+        self.countdown(1, self.controller) # 기다리는 초 숫자 수정
 
     def countdown(self, count, controller):
         if count > 0:
@@ -158,13 +159,7 @@ class PhotoPage(tk.Frame):
 
         container = tk.Frame(self)
         container.pack(expand=True)
-
-        # 캡쳐 버튼 생성
-        self.capture_button = tk.Button(
-            container, text='캡처', height=3, width=10,
-            command=self.capture_image
-        )
-        self.capture_button.pack()
+        self.imgCount = 0
 
         # 웹캠 초기화, 프레임 크기 설정
         self.camera = cv2.VideoCapture(0)
@@ -172,6 +167,13 @@ class PhotoPage(tk.Frame):
         self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         if not self.camera.isOpened():
             raise ValueError("Unable to open video source", 0)
+
+        # 캡쳐 버튼 생성
+        self.capture_button = tk.Button(
+            container, text='캡처', height=3, width=10,
+            command=lambda: self.capture_image(controller)
+        )
+        self.capture_button.pack()
 
         # 화면에 비디오를 표시할 캔버스 생성
         self.vid = MyVideoCapture(self.camera)
@@ -187,7 +189,7 @@ class PhotoPage(tk.Frame):
         # 비디오 프레임 업데이트 함수
         self.update()
 
-    def capture_image(self):
+    def capture_image(self, controller):
         # 파일 저장 디렉토리 및 파일명 설정
         save_directory = "./images"  # 여기에 저장할 디렉토리 경로를 지정하세요
         current_datetime = datetime.datetime.now()
@@ -200,6 +202,10 @@ class PhotoPage(tk.Frame):
             # 지정한 경로에 이미지 저장
             cv2.imwrite(file_path, frame)
             print("이미지가 저장되었습니다:", file_path)
+            print(self.imgCount)
+            self.imgCount += 1   # 촬영한 사진 횟수 증가
+            if self.imgCount >= 3: # 세 장째 촬영했을 경우, 다음 화면으로 이동(사진 선택)
+                controller.show_frame(SelectionPage)
 
     def update(self):
         # 비디오 프레임 업데이트 함수
@@ -251,6 +257,17 @@ class MyVideoCapture:
     def __del__(self):
         # 객체가 삭제될 때 웹캠 닫기
         self.camera.release()
+
+# SelectionPage 클래스 추가
+class SelectionPage(tk.Frame):
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent)
+        self.controller = controller
+        self.create_widgets()
+
+    def create_widgets(self):
+        # 사진들을 표시하고 선택하는 위젯을 여기에 구현
+        pass  # 여기에 구현
 
 
 app = Application()
