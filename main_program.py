@@ -6,7 +6,7 @@ import os
 import ttkbootstrap as ttk
 from ttkbootstrap import Style
 import glob
-from PIL import Image, ImageTk
+from PIL import Image, ImageWin
 import win32print
 import win32ui
 
@@ -319,22 +319,45 @@ class SelectionPage(tk.Frame):
         print(f"선택된 이미지 경로: {self.selected_image_path}")
 
         # 모든 이미지 라벨의 테두리를 제거하고 선택된 이미지에 테두리를 추가합니다.
-        #for i, label in enumerate(self.image_labels):
         for i, label in enumerate(reversed(self.image_labels)):
             label.config(borderwidth=0)
             if self.controller.captured_images[i] == clicked_image_path:
                 label.config(borderwidth=2, relief="solid")
             
-
     def print_image(self):
         if self.selected_image_path is not None:
             print(f"인쇄할 이미지: {self.selected_image_path}")
 
             # 인쇄 명령
+            self.print_to_printer(self.selected_image_path, "Canon SELPHY CP1300 WS")
 
             self.delete_all_images()
         else:
             print("선택된 이미지가 없습니다.")
+
+    def print_to_printer(self, image_path, printer_name):
+        hprinter = win32print.OpenPrinter(printer_name)
+
+        try:
+            hDC = win32ui.CreateDC()
+            hDC.CreatePrinterDC(printer_name)
+            hDC.StartDoc(image_path)
+            hDC.StartPage()
+
+            dib = Image.open(image_path)
+            dib = dib.convert("RGB")
+
+            width, height = dib.size
+
+            dib = ImageWin.Dib(dib)
+
+            dib.draw(hDC.GetHandleOutput(), (0, 0, width, height))
+            hDC.EndPage()
+            hDC.EndDoc()
+            hDC.DeleteDC()
+
+        finally:
+            win32print.ClosePrinter(hprinter)
 
     def delete_all_images(self):
         print("사진 삭제를 시작합니다.")
