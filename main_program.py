@@ -21,7 +21,7 @@ class Application(ttk.Window):
         container.grid_rowconfigure(0, weight=1)
         container.grid_columnconfigure(0, weight=1)
 
-        for F in (StartPage, ReadyPage, ConfirmationPage, PhotoPage):
+        for F in (StartPage, ReadyPage, ConfirmationPage, PhotoPage, PoseRecommandPage):
             frame = F(container, self)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky="nsew")
@@ -39,7 +39,7 @@ class StartPage(tk.Frame):
         container = tk.Frame(self)
         container.pack(expand=True)
 
-        btn_start = tk.Button(container, text="촬영", height=6, width=20,
+        btn_start = tk.Button(container, text="촬영 시작하기", height=6, width=20,
                               font=("Helvetica", 20),
                               command=lambda: controller.show_frame(ReadyPage))
         btn_start.pack()
@@ -76,13 +76,80 @@ class ConfirmationPage(tk.Frame):
 
         btn_yes = tk.Button(container, text="YES", height=3, width=10,
                             font=("Helvetica", 20),
-                            command=lambda: controller.show_frame(PhotoPage))
+                            command=lambda: controller.show_frame(PoseRecommandPage))
         btn_yes.grid(row=1, column=0)
 
         btn_no = tk.Button(container, text="NO", height=3,
                            font=("Helvetica", 20),
                            width=10, command=controller.quit)
         btn_no.grid(row=1, column=1)
+
+
+class PoseRecommandPage(tk.Frame):
+    def __init__(self, parent, controller):
+        # 부모 클래스의 생성자를 호출하여 tk.Frame 초기화
+        tk.Frame.__init__(self, parent)
+        self.controller = controller
+        self.selected_images = []
+
+        # 이 프레임 안에 다른 위젯들을 포함할 컨테이너 프레임 생성
+        container = tk.Frame(self)
+        container.pack(expand=True)
+
+        # 포즈 선택 안내를 위한 라벨 위젯 생성 및 배치
+        label = tk.Label(container,
+                         text='찍을 포즈를 선택해주세요',
+                         width=20,
+                         font=("Helvetica", 20))
+        label.pack()
+
+        # 이미지 버튼을 배치하기 위한 프레임 생성 및 배치
+        buttons_frame = tk.Frame(container)
+        buttons_frame.pack(expand=True)
+
+        # 예시 이미지 파일 경로
+        iamge_paths = ['./assets/pose1.png', './assets/pose2.png', './assets/pose3.png',
+                       './assets/pose4.jpg', './assets/pose5.jpg', './assets/pose6.png']
+
+        # 이미지 객체를 저장할 리스트
+        self.images = []
+
+        # 각 이미지 경로에 대해 반복
+        for i, path in enumerate(iamge_paths):
+            try:
+                # 이미지 파일을 열고 크기 조정
+                image = Image.open(path)
+                image = image.resize((200, 200), Image.ADAPTIVE)
+
+                # PhotoImage 객체 생성
+                photo = ImageTk.PhotoImage(image)
+
+                # 버튼 위젯 생성 및 이미지 할당
+                button = tk.Button(buttons_frame, image=photo,
+                                   command=lambda p=path: self.on_button_click(p))
+
+                # 버튼에 이미지 객체 참조 유지
+                button.image = photo
+
+                # 버튼을 그리드 레이아웃에 배치
+                button.grid(row=i//3, column=i % 3, padx=10, pady=10)
+
+                # 생성된 PhotoImage 객체를 리스트에 저장
+                self.images.append(photo)
+
+            except IOError:
+                print(f"이미지를 로드할 수 없습니다: {path}")
+
+    # 버튼 클릭 이벤트 핸들러
+
+    def on_button_click(self, path):
+        if path not in self.selected_images:
+            self.selected_images.append(path)
+            print(f"{path} 버튼이 클릭됨")
+
+        if len(self.selected_images) == 6:
+            print("선택된 이미지 경로: ", self.selected_images)
+            self.controller.show_frame(PhotoPage)
 
 
 class PhotoPage(tk.Frame):
