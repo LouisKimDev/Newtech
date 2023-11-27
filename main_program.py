@@ -5,6 +5,10 @@ import datetime
 import os
 import ttkbootstrap as ttk
 from ttkbootstrap import Style
+import glob
+from PIL import Image, ImageTk
+import win32print
+import win32ui
 
 class Application(ttk.Window):
     def __init__(self):
@@ -14,6 +18,7 @@ class Application(ttk.Window):
         self.geometry("1280x720")
 
         self.frames = {}
+        self.captured_images = []  # 촬영된 이미지 경로를 저장하는 리스트
 
         container = tk.Frame(self)
         container.pack(side="top", fill="both", expand=True)
@@ -160,6 +165,7 @@ class PhotoPage(tk.Frame):
         container = tk.Frame(self)
         container.pack(expand=True)
         self.imgCount = 0
+        self.controller = controller
 
         # 웹캠 초기화, 프레임 크기 설정
         self.camera = cv2.VideoCapture(0)
@@ -189,6 +195,11 @@ class PhotoPage(tk.Frame):
         # 비디오 프레임 업데이트 함수
         self.update()
 
+    def update_captured_images_list(self):
+            # 최신 3개의 이미지 파일을 가져옵니다.
+            image_files = sorted(glob.glob('./images/*.png'), key=os.path.getmtime, reverse=True)[:3]
+            self.controller.captured_images = image_files
+
     def capture_image(self, controller):
         # 파일 저장 디렉토리 및 파일명 설정
         save_directory = "./images"  # 여기에 저장할 디렉토리 경로를 지정하세요
@@ -202,10 +213,10 @@ class PhotoPage(tk.Frame):
             # 지정한 경로에 이미지 저장
             cv2.imwrite(file_path, frame)
             print("이미지가 저장되었습니다:", file_path)
-            print(self.imgCount)
             self.imgCount += 1   # 촬영한 사진 횟수 증가
             if self.imgCount >= 3: # 세 장째 촬영했을 경우, 다음 화면으로 이동(사진 선택)
-                controller.show_frame(SelectionPage)
+                self.update_captured_images_list()
+                self.controller.show_frame(SelectionPage)
 
     def update(self):
         # 비디오 프레임 업데이트 함수
@@ -263,12 +274,75 @@ class SelectionPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.controller = controller
+        self.selected_image_path = None
+        self.selected_image_index = None  # 선택된 이미지 인덱스를 위한 속성 추가
+        self.image_labels = []
+
+    def on_show_frame(self):
+        # 이전에 생성된 이미지 라벨들을 제거합니다.
+        for label in self.image_labels:
+            label.destroy()
+            self.image_labels.clear()
+
+        # 새로운 이미지 라벨들을 생성합니다.
         self.create_widgets()
 
     def create_widgets(self):
-        # 사진들을 표시하고 선택하는 위젯을 여기에 구현
-        pass  # 여기에 구현
+        images_frame = tk.Frame(self)
+        images_frame.pack(side="top", expand=True)
 
+        image_files = sorted(self.controller.captured_images, key=lambda f: os.path.basename(f))
+        print(image_files)  # 파일 경로 출력
+
+        self.image_labels = []
+        for idx, file in enumerate(image_files):
+            try:
+                img = Image.open(file)
+                img.thumbnail((250, 250))
+                photo = ImageTk.PhotoImage(img)
+                label = tk.Label(images_frame, image=photo)
+                label.image = photo
+                label.index = idx  # 라벨에 인덱스 저장
+                label.bind("<Button-1>", lambda e, file=file: self.select_image(file))
+                label.pack(side="left", padx=10)
+                self.image_labels.append(label)
+            except Exception as e:
+                print(f"Error loading image {file}: {e}")
+
+        # '인쇄' 버튼 생성 및 이벤트 바인딩
+        self.print_button = tk.Button(self, text="인쇄", height=3, width=10, 
+                                      font=("Helvetica", 20), command=self.print_image)
+        self.print_button.pack(side="bottom", pady=20)
+
+    def select_image(self, clicked_image_path):
+        self.selected_image_path = clicked_image_path
+        print(f"선택된 이미지 경로: {self.selected_image_path}")
+
+        # 모든 이미지 라벨의 테두리를 제거하고 선택된 이미지에 테두리를 추가합니다.
+        #for i, label in enumerate(self.image_labels):
+        for i, label in enumerate(reversed(self.image_labels)):
+            label.config(borderwidth=0)
+            if self.controller.captured_images[i] == clicked_image_path:
+                label.config(borderwidth=2, relief="solid")
+            
+
+    def print_image(self):
+        if self.selected_image_path is not None:
+            print(f"인쇄할 이미지: {self.selected_image_path}")
+
+            # 인쇄 명령
+
+            self.delete_all_images()
+        else:
+            print("선택된 이미지가 없습니다.")
+
+    def delete_all_images(self):
+        print("사진 삭제를 시작합니다.")
+        files = glob.glob('./images/*')
+        for f in files:
+            print(f"삭제: {f}")
+            os.remove(f)
+        print("모든 이미지가 삭제되었습니다.")
 
 app = Application()
 app.mainloop()
