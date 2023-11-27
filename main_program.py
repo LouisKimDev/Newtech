@@ -3,14 +3,17 @@ import cv2
 from PIL import Image, ImageTk
 import datetime
 import os
+import ttkbootstrap as ttk
+from ttkbootstrap import Style
 
 
-class Application(tk.Tk):
+class Application(ttk.Window):
     def __init__(self):
         super().__init__()
+        style = Style(theme='minty')  # ttkbootstrap 스타일 적용
+
         self.title("인생한컷")
         self.geometry("1280x720")
-
         self.frames = {}
 
         container = tk.Frame(self)
