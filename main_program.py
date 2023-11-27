@@ -168,7 +168,7 @@ class PhotoPage(tk.Frame):
         self.controller = controller
 
         # 웹캠 초기화, 프레임 크기 설정
-        self.camera = cv2.VideoCapture(0)
+        self.camera = cv2.VideoCapture(1)
         self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         if not self.camera.isOpened():
