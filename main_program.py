@@ -9,6 +9,8 @@ import glob
 from PIL import Image, ImageWin
 import win32print
 import win32ui
+import numpy as np
+
 
 class Application(ttk.Window):
     def __init__(self):
@@ -36,7 +38,7 @@ class Application(ttk.Window):
         frame = self.frames[cont]
         frame.tkraise()
         if hasattr(frame, "on_show_frame"):
-            frame.on_show_frame() # 페이지가 화면에 표시될 때 특정 동작 수행
+            frame.on_show_frame()  # 페이지가 화면에 표시될 때 특정 동작 수행
 
 
 class StartPage(tk.Frame):
@@ -60,7 +62,7 @@ class ReadyPage(tk.Frame):
         self.label.pack(expand=True)
 
     def on_show_frame(self):
-        self.countdown(1, self.controller) # 기다리는 초 숫자 수정
+        self.countdown(1, self.controller)  # 기다리는 초 숫자 수정
 
     def countdown(self, count, controller):
         if count > 0:
@@ -83,12 +85,12 @@ class ConfirmationPage(tk.Frame):
         btn_yes = tk.Button(container, text="YES", height=3, width=10,
                             font=("Helvetica", 20),
                             command=lambda: controller.show_frame(PoseRecommandPage))
-        btn_yes.grid(row=1, column=0)
+        btn_yes.grid(row=1, column=0, padx=10, pady=10)
 
         btn_no = tk.Button(container, text="NO", height=3,
                            font=("Helvetica", 20),
                            width=10, command=controller.quit)
-        btn_no.grid(row=1, column=1)
+        btn_no.grid(row=1, column=1, padx=10, pady=10)
 
 
 class PoseRecommandPage(tk.Frame):
@@ -115,7 +117,7 @@ class PoseRecommandPage(tk.Frame):
 
         # 예시 이미지 파일 경로
         iamge_paths = ['./assets/pose1.png', './assets/pose2.png', './assets/pose3.png',
-                       './assets/pose4.jpg', './assets/pose5.jpg', './assets/pose6.png']
+                       './assets/pose4.png', './assets/pose5.png', './assets/pose6.png']
 
         # 이미지 객체를 저장할 리스트
         self.images = []
@@ -125,7 +127,7 @@ class PoseRecommandPage(tk.Frame):
             try:
                 # 이미지 파일을 열고 크기 조정
                 image = Image.open(path)
-                image = image.resize((200, 200), Image.ADAPTIVE)
+                image = image.resize((320, 180), Image.ADAPTIVE)
 
                 # PhotoImage 객체 생성
                 photo = ImageTk.PhotoImage(image)
@@ -147,25 +149,29 @@ class PoseRecommandPage(tk.Frame):
                 print(f"이미지를 로드할 수 없습니다: {path}")
 
     # 버튼 클릭 이벤트 핸들러
-
     def on_button_click(self, path):
         if path not in self.selected_images:
             self.selected_images.append(path)
+            self.controller.frames[PhotoPage].selected_poses.append(
+                self.selected_images)
             print(f"{path} 버튼이 클릭됨")
 
-        if len(self.selected_images) == 6:
+        if len(self.selected_images) == 3:
             print("선택된 이미지 경로: ", self.selected_images)
+            print("photopage의 selected poses: ",
+                  self.controller.frames[PhotoPage].selected_poses)
             self.controller.show_frame(PhotoPage)
 
 
 class PhotoPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
-
         container = tk.Frame(self)
         container.pack(expand=True)
         self.imgCount = 0
         self.controller = controller
+        self.selected_poses = []
+        self.caputreCount = 0
 
         # 웹캠 초기화, 프레임 크기 설정
         self.camera = cv2.VideoCapture(1)
@@ -196,9 +202,10 @@ class PhotoPage(tk.Frame):
         self.update()
 
     def update_captured_images_list(self):
-            # 최신 3개의 이미지 파일을 가져옵니다.
-            image_files = sorted(glob.glob('./images/*.png'), key=os.path.getmtime, reverse=True)[:3]
-            self.controller.captured_images = image_files
+        # 최신 3개의 이미지 파일을 가져옵니다.
+        image_files = sorted(glob.glob('./images/*.png'),
+                             key=os.path.getmtime, reverse=True)[:3]
+        self.controller.captured_images = image_files
 
     def capture_image(self, controller):
         # 파일 저장 디렉토리 및 파일명 설정
@@ -214,7 +221,7 @@ class PhotoPage(tk.Frame):
             cv2.imwrite(file_path, frame)
             print("이미지가 저장되었습니다:", file_path)
             self.imgCount += 1   # 촬영한 사진 횟수 증가
-            if self.imgCount >= 3: # 세 장째 촬영했을 경우, 다음 화면으로 이동(사진 선택)
+            if self.imgCount >= 3:  # 세 장째 촬영했을 경우, 다음 화면으로 이동(사진 선택)
                 self.update_captured_images_list()
                 self.controller.show_frame(SelectionPage)
 
@@ -224,7 +231,20 @@ class PhotoPage(tk.Frame):
 
         if ret:
             # OpenCV 프레임을 RGB로 변환
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame = cv2.cvtColor(np.array(frame), cv2.COLOR_BGR2RGB)
+
+            # 선택된 포즈 이미지를 캡쳐한 프레임에 차례로 bitwise_or 연산 수행
+            try:
+                if len(self.selected_poses) >= 3:
+                    pose_image = cv2.imread(
+                        self.selected_poses[0][self.imgCount])
+                    pose_image = cv2.resize(
+                        pose_image, (1280, 720))  # 웹캠 프레임 크기에 맞게 조절
+                    frame = cv2.bitwise_or(frame, pose_image)
+            except:
+                pass
+
+            frame = cv2.flip(frame, 1)
 
             # frame을 Tkinter 이미지로 변환 및 참조 저장
             self.photo = ImageTk.PhotoImage(
@@ -252,14 +272,14 @@ class MyVideoCapture:
         # 웹캠에서 현재 프레임 읽기
         ret, frame = self.camera.read()
         if ret:
-            # 현재 시간을 표시할 텍스트 생성
-            font_color = (255, 255, 255)
-            font = cv2.FONT_HERSHEY_DUPLEX
-            dt = datetime.datetime.now()
-            dt = str(dt.strftime("%Y%m%d_%H%M%S"))
-            frame = cv2.putText(frame, dt,
-                                (30, 60),
-                                font, 1, font_color, 4, cv2.LINE_AA)
+            # # 현재 시간을 표시할 텍스트 생성
+            # font_color = (255, 255, 255)
+            # font = cv2.FONT_HERSHEY_DUPLEX
+            # dt = datetime.datetime.now()
+            # dt = str(dt.strftime("%Y%m%d_%H%M%S"))
+            # frame = cv2.putText(frame, dt,
+            #                     (30, 60),
+            #                     font, 1, font_color, 4, cv2.LINE_AA)
 
             return (ret, frame)
         else:
@@ -270,6 +290,8 @@ class MyVideoCapture:
         self.camera.release()
 
 # SelectionPage 클래스 추가
+
+
 class SelectionPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
@@ -291,26 +313,28 @@ class SelectionPage(tk.Frame):
         images_frame = tk.Frame(self)
         images_frame.pack(side="top", expand=True)
 
-        image_files = sorted(self.controller.captured_images, key=lambda f: os.path.basename(f))
+        image_files = sorted(self.controller.captured_images,
+                             key=lambda f: os.path.basename(f))
         print(image_files)  # 파일 경로 출력
 
         self.image_labels = []
         for idx, file in enumerate(image_files):
             try:
                 img = Image.open(file)
-                img.thumbnail((250, 250))
+                img.thumbnail((320, 180))
                 photo = ImageTk.PhotoImage(img)
                 label = tk.Label(images_frame, image=photo)
                 label.image = photo
                 label.index = idx  # 라벨에 인덱스 저장
-                label.bind("<Button-1>", lambda e, file=file: self.select_image(file))
+                label.bind("<Button-1>", lambda e,
+                           file=file: self.select_image(file))
                 label.pack(side="left", padx=10)
                 self.image_labels.append(label)
             except Exception as e:
                 print(f"Error loading image {file}: {e}")
 
         # '인쇄' 버튼 생성 및 이벤트 바인딩
-        self.print_button = tk.Button(self, text="인쇄", height=3, width=10, 
+        self.print_button = tk.Button(self, text="인쇄", height=3, width=10,
                                       font=("Helvetica", 20), command=self.print_image)
         self.print_button.pack(side="bottom", pady=20)
 
@@ -323,13 +347,14 @@ class SelectionPage(tk.Frame):
             label.config(borderwidth=0)
             if self.controller.captured_images[i] == clicked_image_path:
                 label.config(borderwidth=2, relief="solid")
-            
+
     def print_image(self):
         if self.selected_image_path is not None:
             print(f"인쇄할 이미지: {self.selected_image_path}")
 
             # 인쇄 명령
-            self.print_to_printer(self.selected_image_path, "Canon SELPHY CP1300 WS")
+            self.print_to_printer(self.selected_image_path,
+                                  "Canon SELPHY CP1300 WS")
 
             self.delete_all_images()
         else:
@@ -366,6 +391,7 @@ class SelectionPage(tk.Frame):
             print(f"삭제: {f}")
             os.remove(f)
         print("모든 이미지가 삭제되었습니다.")
+
 
 app = Application()
 app.mainloop()
