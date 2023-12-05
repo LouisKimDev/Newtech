@@ -187,5 +187,8 @@ pip-selfcheck.json
 
 # 사용자 정의
 materials/
-
+runs/*
+yolov7/
+images/*
+traced_model.pt
 # End of https://www.toptal.com/developers/gitignore/api/venv,python

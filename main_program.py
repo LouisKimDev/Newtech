@@ -10,6 +10,9 @@ from PIL import Image, ImageWin
 import win32print
 import win32ui
 import numpy as np
+import subprocess
+
+person_check = 0
 
 
 class Application(ttk.Window):
@@ -17,7 +20,7 @@ class Application(ttk.Window):
         super().__init__()
         style = Style(theme='minty')
         self.title("인생한컷")
-        self.geometry("1280x720")
+        self.geometry("1920x1080")
 
         self.frames = {}
         self.captured_images = []  # 촬영된 이미지 경로를 저장하는 리스트
@@ -27,7 +30,7 @@ class Application(ttk.Window):
         container.grid_rowconfigure(0, weight=1)
         container.grid_columnconfigure(0, weight=1)
 
-        for F in (StartPage, ReadyPage, ConfirmationPage, PhotoPage, PoseRecommandPage, SelectionPage):
+        for F in (StartPage, ConfirmationPage, PhotoPage, PoseRecommandPage, SelectionPage):
             frame = F(container, self)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky="nsew")
@@ -49,10 +52,31 @@ class StartPage(tk.Frame):
 
         btn_start = tk.Button(container, text="촬영 시작하기", height=6, width=20,
                               font=("Helvetica", 20),
-                              command=lambda: controller.show_frame(ReadyPage))
+                              command=lambda: self.on_click_start(controller))
         btn_start.pack()
 
+    def on_click_start(self, controller):
+        # 현재 디렉토리 절대경로를 입력받아서 yolo실행
+        current_path = os.getcwd()
+        yolopath = current_path + "\\yolov7\\venv\\Scripts\\python.exe"
+        yolocommand = [
+            current_path + "\\yolov7\\detect.py",
+            "--weights", "yolov7\yolov7.pt",
+            "--conf", "0.25",
+            "--img-size", "640",
+            "--source", "1"
+        ]
+        subprocess.run([yolopath] + yolocommand)
+        global person_check
+        file_path = current_path + "\\person_count.txt"
+        with open(file_path, "r") as file:
+            person_check = file.read()
+        file.close()
+        controller.show_frame(ConfirmationPage)
 
+
+# 5초동안 기다려달라는 화면 출력하는 페이지
+'''
 class ReadyPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
@@ -62,7 +86,14 @@ class ReadyPage(tk.Frame):
         self.label.pack(expand=True)
 
     def on_show_frame(self):
-        self.countdown(1, self.controller)  # 기다리는 초 숫자 수정
+        self.countdown(5, self.controller)  # 기다리는 초 숫자 수정
+
+        # 변경점 아래 5줄
+        global person_check
+        file_path = "C:\\Users\\P\\Desktop\\newtech\\Newtech\\person_count.txt"
+        with open(file_path, "r") as file:
+            person_check = file.read()
+        file.close()
 
     def countdown(self, count, controller):
         if count > 0:
@@ -70,6 +101,7 @@ class ReadyPage(tk.Frame):
             self.after(1000, self.countdown, count-1, controller)
         else:
             controller.show_frame(ConfirmationPage)
+'''
 
 
 class ConfirmationPage(tk.Frame):
@@ -78,9 +110,9 @@ class ConfirmationPage(tk.Frame):
         container = tk.Frame(self)
         container.pack(expand=True)
 
-        lbl_question = tk.Label(
-            container, text="N 명이 맞나요?", font=("Helvetica", 20))
-        lbl_question.grid(row=0, column=0, columnspan=2)
+        self.lbl_question = tk.Label(
+            container, text="", font=("Helvetica", 20))
+        self.lbl_question.grid(row=0, column=0, columnspan=2)
 
         btn_yes = tk.Button(container, text="YES", height=3, width=10,
                             font=("Helvetica", 20),
@@ -91,6 +123,10 @@ class ConfirmationPage(tk.Frame):
                            font=("Helvetica", 20),
                            width=10, command=controller.quit)
         btn_no.grid(row=1, column=1, padx=10, pady=10)
+
+    def on_show_frame(self):
+        global person_check
+        self.lbl_question.config(text=f"{person_check} 명이 맞나요?")
 
 
 class PoseRecommandPage(tk.Frame):
@@ -156,7 +192,7 @@ class PoseRecommandPage(tk.Frame):
                 self.selected_images)
             print(f"{path} 버튼이 클릭됨")
 
-        if len(self.selected_images) == 3:
+        if len(self.selected_images) == 6:  # 포즈 3개 선택 -> 6개로 수정
             print("선택된 이미지 경로: ", self.selected_images)
             print("photopage의 selected poses: ",
                   self.controller.frames[PhotoPage].selected_poses)
@@ -174,7 +210,7 @@ class PhotoPage(tk.Frame):
         self.caputreCount = 0
 
         # 웹캠 초기화, 프레임 크기 설정
-        self.camera = cv2.VideoCapture(1)
+        self.camera = cv2.VideoCapture(0)
         self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         if not self.camera.isOpened():
@@ -202,16 +238,16 @@ class PhotoPage(tk.Frame):
         self.update()
 
     def update_captured_images_list(self):
-        # 최신 3개의 이미지 파일을 가져옵니다.
+        # 최신 6개의 이미지 파일을 가져옵니다.
         image_files = sorted(glob.glob('./images/*.png'),
-                             key=os.path.getmtime, reverse=True)[:3]
+                             key=os.path.getmtime, reverse=True)[:6]
         self.controller.captured_images = image_files
 
     def capture_image(self, controller):
         # 파일 저장 디렉토리 및 파일명 설정
         save_directory = "./images"  # 여기에 저장할 디렉토리 경로를 지정하세요
         current_datetime = datetime.datetime.now()
-        filename = current_datetime.strftime("%Y%m%d_%H%M%S.png")
+        filename = current_datetime.strftime(f"{self.imgCount+1}.png")
         file_path = os.path.join(save_directory, filename)
 
         # 카메라에서 현재 프레임 캡처
@@ -221,7 +257,7 @@ class PhotoPage(tk.Frame):
             cv2.imwrite(file_path, frame)
             print("이미지가 저장되었습니다:", file_path)
             self.imgCount += 1   # 촬영한 사진 횟수 증가
-            if self.imgCount >= 3:  # 세 장째 촬영했을 경우, 다음 화면으로 이동(사진 선택)
+            if self.imgCount >= 6:  # 여섯 장째 촬영했을 경우, 다음 화면으로 이동(사진 선택)
                 self.update_captured_images_list()
                 self.controller.show_frame(SelectionPage)
 
@@ -235,7 +271,7 @@ class PhotoPage(tk.Frame):
 
             # 선택된 포즈 이미지를 캡쳐한 프레임에 차례로 bitwise_or 연산 수행
             try:
-                if len(self.selected_poses) >= 3:
+                if len(self.selected_poses) >= 6:   # 포즈 3개 선택 -> 6개로 수정
                     pose_image = cv2.imread(
                         self.selected_poses[0][self.imgCount])
                     pose_image = cv2.resize(
@@ -309,9 +345,13 @@ class SelectionPage(tk.Frame):
         # 새로운 이미지 라벨들을 생성합니다.
         self.create_widgets()
 
+    # 촬영한 사진 보여주는 함수
     def create_widgets(self):
-        images_frame = tk.Frame(self)
-        images_frame.pack(side="top", expand=True)
+        images_frame_top = tk.Frame(self)
+        images_frame_top.pack(side="top", expand=True, pady=0)
+
+        images_frame_bottom = tk.Frame(self)
+        images_frame_bottom.pack(side="top", expand=True, pady=0)
 
         image_files = sorted(self.controller.captured_images,
                              key=lambda f: os.path.basename(f))
@@ -323,7 +363,14 @@ class SelectionPage(tk.Frame):
                 img = Image.open(file)
                 img.thumbnail((320, 180))
                 photo = ImageTk.PhotoImage(img)
-                label = tk.Label(images_frame, image=photo)
+
+                # 상단 프레임 또는 하단 프레임에 이미지 라벨 추가
+                if idx < 3:
+                    parent_frame = images_frame_top
+                else:
+                    parent_frame = images_frame_bottom
+
+                label = tk.Label(parent_frame, image=photo)
                 label.image = photo
                 label.index = idx  # 라벨에 인덱스 저장
                 label.bind("<Button-1>", lambda e,
@@ -353,23 +400,58 @@ class SelectionPage(tk.Frame):
             print(f"인쇄할 이미지: {self.selected_image_path}")
 
             # 인쇄 명령
-            self.print_to_printer(self.selected_image_path,
-                                  "Canon SELPHY CP1300 WS")
+            self.print_to_printer("Canon SELPHY CP1300 WS")
 
             self.delete_all_images()
         else:
             print("선택된 이미지가 없습니다.")
 
-    def print_to_printer(self, image_path, printer_name):
+    def print_to_printer(self, printer_name):
         hprinter = win32print.OpenPrinter(printer_name)
+
+        # mainimage.png를 엽니다.
+        main_image = Image.open("./main_image.png")
+
+        # 1.png, 2.png, 3.png, 4.png를 엽니다.
+        image1 = Image.open("./images/1.png")
+        image2 = Image.open("./images/2.png")
+        image3 = Image.open("./images/3.png")
+        image4 = Image.open("./images/4.png")
+
+        # 각각의 사각형의 좌표를 정의합니다.
+        rect1 = [(217, 66), (634, 343)]
+        rect2 = [(646, 66), (1063, 343)]
+        rect3 = [(217, 355), (634, 632)]
+        rect4 = [(646, 355), (1063, 632)]
+
+        # 각각의 사각형의 크기를 계산합니다.
+        size1 = (417, 277)
+        size2 = (417, 277)
+        size3 = (417, 277)
+        size4 = (417, 277)
+
+        # 각각의 1.png, 2.png, 3.png, 4.png를 새로운 크기로 조정합니다.
+        image1 = image1.resize(size1)
+        image2 = image2.resize(size2)
+        image3 = image3.resize(size3)
+        image4 = image4.resize(size4)
+
+        # 조정된 이미지를 mainimage.png 위에 얹습니다.
+        main_image.paste(image1, rect1[0])
+        main_image.paste(image2, rect2[0])
+        main_image.paste(image3, rect3[0])
+        main_image.paste(image4, rect4[0])
+
+        # 결과 이미지를 저장합니다.
+        main_image.save("./images/result.png")
 
         try:
             hDC = win32ui.CreateDC()
             hDC.CreatePrinterDC(printer_name)
-            hDC.StartDoc(image_path)
+            hDC.StartDoc("./images/result.png")
             hDC.StartPage()
 
-            dib = Image.open(image_path)
+            dib = Image.open("./images/result.png")
             dib = dib.convert("RGB")
 
             width, height = dib.size
