@@ -1,16 +1,22 @@
-import tkinter as tk
+import numpy as np
 import cv2
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageWin
 import datetime
 import os
-import ttkbootstrap as ttk
-from ttkbootstrap import Style
 import glob
-from PIL import Image, ImageWin
+import subprocess
 import win32print
 import win32ui
-import numpy as np
-import subprocess
+import tkinter as tk
+import ttkbootstrap as ttk
+from ttkbootstrap import Style
+from ttkbootstrap.constants import *
+from pynput import keyboard
+import pygame
+import threading
+
+# 셔터 소리 파일 경로 지정
+current_path = str(os.getcwd())
 
 person_check = 0
 
@@ -18,20 +24,25 @@ person_check = 0
 class Application(ttk.Window):
     def __init__(self):
         super().__init__()
-        style = Style(theme='minty')
+        style = Style(theme='vapor')
+        style.configure('TButton', font=('Helvetica', 30, 'bold'))
         self.title("인생한컷")
         self.geometry("1920x1080")
 
         self.frames = {}
         self.captured_images = []  # 촬영된 이미지 경로를 저장하는 리스트
 
+        # container 객체 지정, tkinter이용
         container = tk.Frame(self)
         container.pack(side="top", fill="both", expand=True)
         container.grid_rowconfigure(0, weight=1)
         container.grid_columnconfigure(0, weight=1)
 
+        # frame에 각 페이지클래스의 컨테이너, self 객체 저장
         for F in (StartPage, ConfirmationPage, PhotoPage, PoseRecommandPage, SelectionPage):
+            # 각 페이지를 생성할 때 parent를 container로, controller을 self로 지정
             frame = F(container, self)
+            # frames에 페이지 클래스를 key로, frame을 value로 저장
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky="nsew")
 
@@ -44,16 +55,16 @@ class Application(ttk.Window):
             frame.on_show_frame()  # 페이지가 화면에 표시될 때 특정 동작 수행
 
 
-class StartPage(tk.Frame):
+class StartPage(ttk.Frame):
     def __init__(self, parent, controller):
-        tk.Frame.__init__(self, parent)
-        container = tk.Frame(self)
+        super().__init__(parent)
+
+        container = ttk.Frame(self)
         container.pack(expand=True)
 
-        btn_start = tk.Button(container, text="촬영 시작하기", height=6, width=20,
-                              font=("Helvetica", 20),
-                              command=lambda: self.on_click_start(controller))
-        btn_start.pack()
+        btn_start = ttk.Button(container, text="촬영 시작하기", padding="80 60",
+                               command=lambda: self.on_click_start(controller))
+        btn_start.pack(pady=20)
 
     def on_click_start(self, controller):
         # 현재 디렉토리 절대경로를 입력받아서 yolo실행
@@ -111,17 +122,15 @@ class ConfirmationPage(tk.Frame):
         container.pack(expand=True)
 
         self.lbl_question = tk.Label(
-            container, text="", font=("Helvetica", 20))
+            container, text="", font=("Helvetica", 30, 'bold'))
         self.lbl_question.grid(row=0, column=0, columnspan=2)
 
-        btn_yes = tk.Button(container, text="YES", height=3, width=10,
-                            font=("Helvetica", 20),
-                            command=lambda: controller.show_frame(PoseRecommandPage))
+        btn_yes = ttk.Button(container, text="YES", padding="40 30",
+                             command=lambda: controller.show_frame(PoseRecommandPage))
         btn_yes.grid(row=1, column=0, padx=10, pady=10)
 
-        btn_no = tk.Button(container, text="NO", height=3,
-                           font=("Helvetica", 20),
-                           width=10, command=controller.quit)
+        btn_no = ttk.Button(container, text="NO", padding="40 30",
+                            command=controller.quit)
         btn_no.grid(row=1, column=1, padx=10, pady=10)
 
     def on_show_frame(self):
@@ -144,11 +153,11 @@ class PoseRecommandPage(tk.Frame):
         label = tk.Label(container,
                          text='찍을 포즈를 선택해주세요',
                          width=20,
-                         font=("Helvetica", 20))
+                         font=("Helvetica", 30, 'bold'))
         label.pack()
 
         # 이미지 버튼을 배치하기 위한 프레임 생성 및 배치
-        buttons_frame = tk.Frame(container)
+        buttons_frame = ttk.Frame(container)
         buttons_frame.pack(expand=True)
 
         # 예시 이미지 파일 경로
@@ -163,14 +172,14 @@ class PoseRecommandPage(tk.Frame):
             try:
                 # 이미지 파일을 열고 크기 조정
                 image = Image.open(path)
-                image = image.resize((320, 180), Image.ADAPTIVE)
+                image = image.resize((480, 240), Image.ADAPTIVE)
 
                 # PhotoImage 객체 생성
                 photo = ImageTk.PhotoImage(image)
 
                 # 버튼 위젯 생성 및 이미지 할당
-                button = tk.Button(buttons_frame, image=photo,
-                                   command=lambda p=path: self.on_button_click(p))
+                button = ttk.Button(buttons_frame, image=photo,
+                                    command=lambda p=path: self.on_button_click(p))
 
                 # 버튼에 이미지 객체 참조 유지
                 button.image = photo
@@ -192,43 +201,44 @@ class PoseRecommandPage(tk.Frame):
                 self.selected_images)
             print(f"{path} 버튼이 클릭됨")
 
-        if len(self.selected_images) == 6:  # 포즈 3개 선택 -> 6개로 수정
-            print("선택된 이미지 경로: ", self.selected_images)
-            print("photopage의 selected poses: ",
-                  self.controller.frames[PhotoPage].selected_poses)
+        if len(self.selected_images) == 6:  # 포즈 6개 선택
+            # print("선택된 이미지 경로: ", self.selected_images)
+            # print("photopage의 selected poses: ",
+            #       self.controller.frames[PhotoPage].selected_poses)
             self.controller.show_frame(PhotoPage)
 
 
 class PhotoPage(tk.Frame):
     def __init__(self, parent, controller):
-        tk.Frame.__init__(self, parent)
+        super().__init__(parent)
         container = tk.Frame(self)
         container.pack(expand=True)
+
         self.imgCount = 0
         self.controller = controller
         self.selected_poses = []
         self.caputreCount = 0
 
+        pygame.mixer.init()
+
+        # 키보드 리스너 시작
+        self.listener = keyboard.Listener(on_press=self.on_press)
+        self.listener.start()
+
         # 웹캠 초기화, 프레임 크기 설정
         self.camera = cv2.VideoCapture(0)
-        self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+        self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
         if not self.camera.isOpened():
             raise ValueError("Unable to open video source", 0)
 
-        # 캡쳐 버튼 생성
-        self.capture_button = tk.Button(
-            container, text='캡처', height=3, width=10,
-            command=lambda: self.capture_image(controller)
-        )
-        self.capture_button.pack()
-
         # 화면에 비디오를 표시할 캔버스 생성
         self.vid = MyVideoCapture(self.camera)
-        self.canvas = tk.Canvas(
+
+        self.canvas = ttk.Canvas(
             self, width=self.vid.width, height=self.vid.height
         )
-        self.canvas.pack()
+        self.canvas.pack(expand=True, anchor=CENTER)
 
         # 비디오 프레임 속도 및 업데이트 간격 설정
         self.fps = self.camera.get(cv2.CAP_PROP_FPS)
@@ -237,13 +247,23 @@ class PhotoPage(tk.Frame):
         # 비디오 프레임 업데이트 함수
         self.update()
 
+        '''
+        # 캡쳐 버튼 생성
+        self.capture_button = ttk.Button(
+            container, text='촬영', padding="40 30",
+            command=lambda: self.capture_image(controller)
+        )
+        self.capture_button.pack()
+        '''
+
     def update_captured_images_list(self):
         # 최신 6개의 이미지 파일을 가져옵니다.
         image_files = sorted(glob.glob('./images/*.png'),
                              key=os.path.getmtime, reverse=True)[:6]
         self.controller.captured_images = image_files
 
-    def capture_image(self, controller):
+    '''
+   def capture_image(self, controller):
         # 파일 저장 디렉토리 및 파일명 설정
         save_directory = "./images"  # 여기에 저장할 디렉토리 경로를 지정하세요
         current_datetime = datetime.datetime.now()
@@ -260,6 +280,30 @@ class PhotoPage(tk.Frame):
             if self.imgCount >= 6:  # 여섯 장째 촬영했을 경우, 다음 화면으로 이동(사진 선택)
                 self.update_captured_images_list()
                 self.controller.show_frame(SelectionPage)
+    '''
+
+    # 키보드 입력 감지해서 화면 캡쳐
+    def on_press(self, key):
+        global current_path
+        audio_file = current_path + "\\assets\\shutter_sound.mp3"
+
+        if str(key) == "Key.enter":
+            sound = pygame.mixer.Sound(audio_file)
+            sound.play()
+            save_directory = "./images"  # 여기에 저장할 디렉토리 경로를 지정하세요
+            current_datetime = datetime.datetime.now()
+            filename = current_datetime.strftime(f"{self.imgCount+1}.png")
+            file_path = os.path.join(save_directory, filename)
+            # 카메라에서 현재 프레임 캡처
+            ret, frame = self.camera.read()
+            if ret:
+                # 지정한 경로에 이미지 저장
+                cv2.imwrite(file_path, frame)
+                print("이미지가 저장되었습니다:", file_path)
+                self.imgCount += 1   # 촬영한 사진 횟수 증가
+                if self.imgCount >= 6:  # 여섯 장째 촬영했을 경우, 다음 화면으로 이동(사진 선택)
+                    self.update_captured_images_list()
+                    self.controller.show_frame(SelectionPage)
 
     def update(self):
         # 비디오 프레임 업데이트 함수
@@ -275,7 +319,7 @@ class PhotoPage(tk.Frame):
                     pose_image = cv2.imread(
                         self.selected_poses[0][self.imgCount])
                     pose_image = cv2.resize(
-                        pose_image, (1280, 720))  # 웹캠 프레임 크기에 맞게 조절
+                        pose_image, (1920, 1080))  # 웹캠 프레임 크기에 맞게 조절
                     frame = cv2.bitwise_or(frame, pose_image)
             except:
                 pass
@@ -325,9 +369,8 @@ class MyVideoCapture:
         # 객체가 삭제될 때 웹캠 닫기
         self.camera.release()
 
+
 # SelectionPage 클래스 추가
-
-
 class SelectionPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
@@ -381,13 +424,14 @@ class SelectionPage(tk.Frame):
                 print(f"Error loading image {file}: {e}")
 
         # '인쇄' 버튼 생성 및 이벤트 바인딩
-        self.print_button = tk.Button(self, text="인쇄", height=3, width=10,
-                                      font=("Helvetica", 20), command=self.print_image)
+        self.print_button = ttk.Button(
+            self, text="인쇄", command=self.print_image,
+            padding="80 60")
         self.print_button.pack(side="bottom", pady=20)
 
     def select_image(self, clicked_image_path):
         self.selected_image_path = clicked_image_path
-        print(f"선택된 이미지 경로: {self.selected_image_path}")
+        # print(f"선택된 이미지 경로: {self.selected_image_path}")
 
         # 모든 이미지 라벨의 테두리를 제거하고 선택된 이미지에 테두리를 추가합니다.
         for i, label in enumerate(reversed(self.image_labels)):
