@@ -13,7 +13,6 @@ from ttkbootstrap import Style
 from ttkbootstrap.constants import *
 from pynput import keyboard
 import pygame
-import threading
 
 current_path = os.getcwd()
 
@@ -38,7 +37,7 @@ class Application(ttk.Window):
         container.grid_columnconfigure(0, weight=1)
 
         # frame에 각 페이지클래스의 컨테이너, self 객체 저장
-        for F in (StartPage, ConfirmationPage, PhotoPage, PoseRecommandPage, SelectionPage):
+        for F in (StartPage, ConfirmationPage, PersonConfigPage, PhotoPage, PoseRecommandPage, SelectionPage):
             # 각 페이지를 생성할 때 parent를 container로, controller을 self로 지정
             frame = F(container, self)
             # frames에 페이지 클래스를 key로, frame을 value로 저장
@@ -85,30 +84,6 @@ class StartPage(ttk.Frame):
         controller.show_frame(ConfirmationPage)
 
 
-# 5초동안 기다려달라는 화면 출력하는 페이지
-'''    def on_click_start(self, controller):
-        # 변경점 아래 두줄
-        yolopath = "C:\\Users\\P\\Desktop\\newtech\\Newtech\\yolov7\\venv\\Scripts\\python.exe"
-        yolocommand = [
-                "C:\\Users\\P\\Desktop\\newtech\\Newtech\\yolov7\\detect.py",
-                "--weights", "yolov7\yolov7.pt",
-                "--conf", "0.25",
-                "--img-size", "640",
-                "--source", "1"
-        ]
-        subprocess.run([yolopath] + yolocommand)
-        global person_check
-        file_path = "C:\\Users\\P\\Desktop\\newtech\\Newtech\\person_count.txt"
-        with open(file_path, "r") as file:
-            person_check = file.read()
-        file.close()
-        controller.show_frame(ConfirmationPage)
-        
-
-# 5초동안 기다려달라는 화면 출력하는 페이지
-'''
-
-
 class ReadyPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
@@ -122,7 +97,8 @@ class ReadyPage(tk.Frame):
 
         # 변경점 아래 5줄
         global person_check
-        file_path = "C:\\Users\\P\\Desktop\\newtech\\Newtech\\person_count.txt"
+        global current_path
+        file_path = current_path + "\\person_count.txt"
         with open(file_path, "r") as file:
             person_check = file.read()
         file.close()
@@ -133,10 +109,6 @@ class ReadyPage(tk.Frame):
             self.after(1000, self.countdown, count-1, controller)
         else:
             controller.show_frame(ConfirmationPage)
-
-
-'''
-'''
 
 
 class ConfirmationPage(tk.Frame):
@@ -153,13 +125,52 @@ class ConfirmationPage(tk.Frame):
                              command=lambda: controller.show_frame(PoseRecommandPage))
         btn_yes.grid(row=1, column=0, padx=10, pady=10)
 
-        btn_no = ttk.Button(container, text="NO", padding="40 30",
-                            command=controller.quit)
+        btn_no = ttk.Button(container, text="NO", padding="50 30",
+                            command=lambda: controller.show_frame(PersonConfigPage))
         btn_no.grid(row=1, column=1, padx=10, pady=10)
 
     def on_show_frame(self):
         global person_check
         self.lbl_question.config(text=f"{person_check} 명이 맞나요?")
+
+
+# 만약 객체인식이 틀리면 수정하는 페이지
+class PersonConfigPage(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+        container = tk.Frame(self)
+        container.pack(expand=True)
+        label = tk.Label(container,
+                         text='현재 인원 수를 선택해주세요',
+                         font=('Helvetica', 30, 'bold'))
+        label.pack()
+
+        # 인원수 버튼 컨테이너
+        buttons_frame = ttk.Frame(container)
+
+        # 확인 버튼 컨테이너
+        next_frame = ttk.Frame(container)
+
+        # 1 ~ 4명의 버튼 생성
+        for i in range(4):
+            button = ttk.Button(buttons_frame, text=f'{i+1}명',
+                                command=lambda i=i: self.on_click_num(controller, i+1))
+            button.grid(row=i//2, column=i % 2, padx=10, pady=10)
+        buttons_frame.pack()
+        # 다음 페이지로 넘어가는 버튼 생성
+        next_button = ttk.Button(next_frame, text='확인',
+                                 command=lambda: controller.show_frame(PoseRecommandPage))
+        next_button.grid(padx=10, pady=10)
+        next_frame.pack()
+
+    # 누른 버튼에 따라 person_count.txt 내용 수정
+    def on_click_num(self, controller, person_num):
+        global current_path
+        print(f'{person_num}명 클릭 됨')
+        file_path = current_path + "\\person_count.txt"
+        with open(file_path, "w") as file:
+            file.write(f'{person_num}')
 
 
 class PoseRecommandPage(tk.Frame):
@@ -273,42 +284,12 @@ class PhotoPage(tk.Frame):
         # 비디오 프레임 업데이트 함수
         self.update()
 
-        '''
-        # 캡쳐 버튼 생성
-        self.capture_button = ttk.Button(
-            container, text='촬영', padding="40 30",
-            command=lambda: self.capture_image(controller)
-        )
-        self.capture_button.pack()
-        '''
-
     def update_captured_images_list(self):
         # 최신 6개의 이미지 파일을 가져옵니다.
         global current_path
         image_files = sorted(glob.glob(current_path + '\\images\\*.png'),
                              key=os.path.getmtime, reverse=True)[:6]
         self.controller.captured_images = image_files
-
-    '''
-   def capture_image(self, controller):
-        # 파일 저장 디렉토리 및 파일명 설정
-        global current_path
-        save_directory = current_path + "\\images"  # 여기에 저장할 디렉토리 경로를 지정하세요
-        current_datetime = datetime.datetime.now()
-        filename = current_datetime.strftime(f"{self.imgCount+1}.png")
-        file_path = os.path.join(save_directory, filename)
-
-        # 카메라에서 현재 프레임 캡처
-        ret, frame = self.camera.read()
-        if ret:
-            # 지정한 경로에 이미지 저장
-            cv2.imwrite(file_path, frame)
-            print("이미지가 저장되었습니다:", file_path)
-            self.imgCount += 1   # 촬영한 사진 횟수 증가
-            if self.imgCount >= 6:  # 여섯 장째 촬영했을 경우, 다음 화면으로 이동(사진 선택)
-                self.update_captured_images_list()
-                self.controller.show_frame(SelectionPage)
-    '''
 
     # 키보드 입력 감지해서 화면 캡쳐
     def on_press(self, key):
@@ -380,15 +361,6 @@ class MyVideoCapture:
         # 웹캠에서 현재 프레임 읽기
         ret, frame = self.camera.read()
         if ret:
-            # # 현재 시간을 표시할 텍스트 생성
-            # font_color = (255, 255, 255)
-            # font = cv2.FONT_HERSHEY_DUPLEX
-            # dt = datetime.datetime.now()
-            # dt = str(dt.strftime("%Y%m%d_%H%M%S"))
-            # frame = cv2.putText(frame, dt,
-            #                     (30, 60),
-            #                     font, 1, font_color, 4, cv2.LINE_AA)
-
             return (ret, frame)
         else:
             return (ret, None)
