@@ -388,32 +388,20 @@ class SelectionPage(tk.Frame):
         self.available_number_images = self.initial_number_images.copy()
         self.image_selection_status = {}
 
-        # 인쇄 버튼을 위한 컨테이너
-        print_button_container = tk.Frame(self)
-        print_button_container.pack(side="bottom", pady=0, expand=True)
+        self.print_button = tk.Button(self, text="인쇄", height=3, width=10,
+                                      font=("Helvetica", 20), command=self.print_image,
+                                      state=tk.DISABLED)
+        self.print_button.pack(side="bottom", pady=20)
 
-        # 인쇄 버튼을 포함하는 프레임 생성
-        print_button_frame = tk.Frame(self)
-        print_button_frame.pack(side="bottom", fill=tk.X, pady=0)
 
-        # 인쇄 버튼
-        self.print_button = tk.Button(print_button_frame, text="인쇄", height=3, width=10,
-                                    font=("Helvetica", 20), command=self.print_image,
-                                    state=tk.DISABLED)
-        self.print_button.pack(side="top", anchor="center")
-
-        # 가이드 이미지를 포함하는 별도의 프레임 생성
-        guide_image_frame = tk.Frame(self)
-        guide_image_frame.pack(side="bottom", fill=tk.X)
-
-        # 가이드 이미지
         guide_image_path = current_path + '\\assets\\guide_image.png'
         guide_img = Image.open(guide_image_path)
-        guide_img = guide_img.resize((200, 130))
+        guide_img = guide_img.resize((80, 60))  # 크기 조정
         guide_photo = ImageTk.PhotoImage(guide_img)
-        guide_label = tk.Label(guide_image_frame, image=guide_photo)
-        guide_label.image = guide_photo
-        guide_label.pack(side="right", padx=500)
+        guide_label = tk.Label(self, image=guide_photo)
+        guide_label.image = guide_photo  # 참조 유지
+        guide_label.grid(row=2, column=2, padx=10, pady=10)  # 3행 3열에 배치
+
 
     def on_show_frame(self):
         for label in self.image_labels:
@@ -422,39 +410,27 @@ class SelectionPage(tk.Frame):
         self.create_widgets()
 
     def create_widgets(self):
-        images_container = tk.Frame(self)
-        images_container.pack(side="top", expand=True)
-
-        images_frame_top = tk.Frame(images_container)
-        images_frame_top.pack(side="top", expand=True)
-
-        images_frame_bottom = tk.Frame(images_container)
-        images_frame_bottom.pack(side="top", expand=True, pady=5)
-
         image_files = sorted(self.controller.captured_images,
                             key=lambda f: os.path.basename(f))
         print(image_files)
 
-        self.image_labels = []
         for idx, file in enumerate(image_files):
-            try:
-                img = Image.open(file)
-                img.thumbnail((320, 180))
-                photo = ImageTk.PhotoImage(img)
+            img = Image.open(file)
+            img.thumbnail((320, 180))
+            photo = ImageTk.PhotoImage(img)
+            label = tk.Label(self, image=photo)
+            label.image = photo
+            row = idx // 3
+            col = idx % 3
+            label.grid(row=row, column=col, padx=10, pady=10)
+            self.image_labels.append(label)
 
-                if idx < 3:
-                    parent_frame = images_frame_top
-                else:
-                    parent_frame = images_frame_bottom
+        # '인쇄' 버튼 추가
+        self.print_button = tk.Button(self, text="인쇄", height=3, width=10,
+                                      font=("Helvetica", 20), command=self.print_image,
+                                      state=tk.DISABLED)
+        self.print_button.grid(row=2, column=1, pady=20)
 
-                label = tk.Label(parent_frame, image=photo)
-                label.image = photo
-                label.index = idx
-                label.bind("<Button-1>", lambda e, idx=idx, file=file: self.select_image(idx, file))
-                label.pack(side="left", padx=10)
-                self.image_labels.append(label)
-            except Exception as e:
-                print(f"Error loading image {file}: {e}")
 
     def select_image(self, selected_index, clicked_image_path):
         if clicked_image_path in self.image_selection_status and self.image_selection_status[clicked_image_path]:
@@ -525,8 +501,9 @@ class SelectionPage(tk.Frame):
 
         selected_images = self.controller.frames[SelectionPage].selected_ordered_images
 
-        rects = [(208, 113), (646, 113), (208, 365), (646, 365)]
-        size = (426, 240) # 1280x720 / 3 
+        # 이미지 위치를 정의합니다.
+        rects = [(217, 66), (646, 66), (217, 355), (646, 355)]
+        size = (417, 277)  # 이미지 크기
    
         for idx, selected_image in enumerate(selected_images):
             image = Image.open(selected_image)
@@ -541,7 +518,7 @@ class SelectionPage(tk.Frame):
         
         # 조정된 이미지를 저장
         main_image.save(current_path + "\\images\\result.png")
-        
+        '''
         try:
             hDC = win32ui.CreateDC()
             hDC.CreatePrinterDC(printer_name)
@@ -561,7 +538,7 @@ class SelectionPage(tk.Frame):
             hDC.DeleteDC()
         finally:
             win32print.ClosePrinter(hprinter)
-        
+        '''
     def delete_all_images(self):
         global current_path
         print("사진 삭제를 시작합니다.")
