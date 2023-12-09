@@ -14,8 +14,10 @@ from ttkbootstrap.constants import *
 from pynput import keyboard
 import pygame
 
+# 현재 디렉토리 경로
 current_path = os.getcwd()
 
+# 객체인식으로 인식된 사람 수
 person_check = 0
 
 
@@ -37,7 +39,7 @@ class Application(ttk.Window):
         container.grid_columnconfigure(0, weight=1)
 
         # frame에 각 페이지클래스의 컨테이너, self 객체 저장
-        for F in (StartPage, ConfirmationPage, PersonConfigPage, PhotoPage, PoseRecommandPage, SelectionPage):
+        for F in (StartPage, ConfirmationPage, PersonConfigPage, ModeSelectPage, PhotoPage, PoseRecommandPage, SelectionPage):
             # 각 페이지를 생성할 때 parent를 container로, controller을 self로 지정
             frame = F(container, self)
             # frames에 페이지 클래스를 key로, frame을 value로 저장
@@ -75,7 +77,7 @@ class StartPage(ttk.Frame):
             "--img-size", "640",
             "--source", "1"
         ]
-        #subprocess.run([yolopath] + yolocommand)
+        # subprocess.run([yolopath] + yolocommand)
         global person_check
         file_path = current_path + "\\person_count.txt"
         with open(file_path, "r") as file:
@@ -122,7 +124,7 @@ class ConfirmationPage(tk.Frame):
         self.lbl_question.grid(row=0, column=0, columnspan=2)
 
         btn_yes = ttk.Button(container, text="YES", padding="40 30",
-                             command=lambda: controller.show_frame(PoseRecommandPage))
+                             command=lambda: controller.show_frame(ModeSelectPage))
         btn_yes.grid(row=1, column=0, padx=10, pady=10)
 
         btn_no = ttk.Button(container, text="NO", padding="50 30",
@@ -156,12 +158,12 @@ class PersonConfigPage(tk.Frame):
         for i in range(4):
             button = ttk.Button(buttons_frame, text=f'{i+1}명',
                                 command=lambda i=i: self.on_click_num(controller, i+1))
-            button.grid(row=i//2, column=i % 2, padx=10, pady=10)
+            button.grid(row=i//2, column=i % 2, padx=20, pady=20)
         buttons_frame.pack()
         # 다음 페이지로 넘어가는 버튼 생성
         next_button = ttk.Button(next_frame, text='확인',
-                                 command=lambda: controller.show_frame(PoseRecommandPage))
-        next_button.grid(padx=10, pady=10)
+                                 command=lambda: controller.show_frame(ModeSelectPage))
+        next_button.grid(padx=20, pady=20)
         next_frame.pack()
 
     # 누른 버튼에 따라 person_count.txt 내용 수정
@@ -171,6 +173,47 @@ class PersonConfigPage(tk.Frame):
         file_path = current_path + "\\person_count.txt"
         with open(file_path, "w") as file:
             file.write(f'{person_num}')
+
+
+# 포즈 가이드, 배경 선택, 바닐라 모드 선택 페이지
+class ModeSelectPage(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+        container = tk.Frame(self)
+        container.pack(expand=True)
+        label = tk.Label(container,
+                         text='원하는 모드를 선택해 주세요.',
+                         font=('Helvetica', 30, 'bold'))
+        label.pack()
+
+        # 모드 선택 버튼 컨테이너
+        buttons_frame = ttk.Frame(container)
+
+        # 버튼 생성
+        button1 = ttk.Button(buttons_frame, text='포즈 가이드 모드', padding="40 30",
+                             command=lambda i=1: self.on_click_num(controller, i))
+        button1.grid(row=0, column=0, padx=20, pady=20)
+
+        button2 = ttk.Button(buttons_frame, text='배경 선택 모드', padding="50 30",
+                             command=lambda i=2: self.on_click_num(controller, i))
+        button2.grid(row=0, column=1, padx=20, pady=20)
+
+        button3 = ttk.Button(buttons_frame, text='기본 모드', padding="80 30",
+                             command=lambda i=3: self.on_click_num(controller, i))
+        button3.grid(row=0, column=2, padx=20, pady=20)
+        buttons_frame.pack()
+
+    # 누른 버튼에 따라 person_count.txt 내용 수정
+
+    def on_click_num(self, controller, mode_num):
+        if mode_num == 1:
+            controller.show_frame(PoseRecommandPage)
+        elif mode_num == 2:
+            pass
+            # controller.show_frame(ChromakeyPage)
+        elif mode_num == 3:
+            controller.show_frame(PhotoPage)
 
 
 class PoseRecommandPage(tk.Frame):
@@ -410,7 +453,7 @@ class SelectionPage(tk.Frame):
         images_frame_bottom.pack(side="top", expand=True, pady=5)
 
         image_files = sorted(self.controller.captured_images,
-                            key=lambda f: os.path.basename(f))
+                             key=lambda f: os.path.basename(f))
         print(image_files)
 
         self.image_labels = []
@@ -428,7 +471,8 @@ class SelectionPage(tk.Frame):
                 label = tk.Label(parent_frame, image=photo)
                 label.image = photo
                 label.index = idx
-                label.bind("<Button-1>", lambda e, idx=idx, file=file: self.select_image(idx, file))
+                label.bind("<Button-1>", lambda e, idx=idx,
+                           file=file: self.select_image(idx, file))
                 label.pack(side="left", padx=10)
                 self.image_labels.append(label)
             except Exception as e:
@@ -439,13 +483,15 @@ class SelectionPage(tk.Frame):
             self.remove_overlay(selected_index, clicked_image_path)
             used_number_image = self.image_selection_status[clicked_image_path]
             self.available_number_images.append(used_number_image)
-            self.available_number_images.sort(key=lambda x: self.initial_number_images.index(x))
+            self.available_number_images.sort(
+                key=lambda x: self.initial_number_images.index(x))
             self.image_selection_status[clicked_image_path] = None
             self.selected_ordered_images.remove(clicked_image_path)
         else:
             if self.available_number_images:
                 number_image_path = self.available_number_images.pop(0)
-                overlaid_image = self.overlay_number_on_image(clicked_image_path, number_image_path)
+                overlaid_image = self.overlay_number_on_image(
+                    clicked_image_path, number_image_path)
                 self.update_image_label(selected_index, overlaid_image)
                 self.selected_images.append(clicked_image_path)
                 self.image_selection_status[clicked_image_path] = number_image_path
@@ -469,7 +515,8 @@ class SelectionPage(tk.Frame):
         number_image = Image.open(number_image_path).convert("RGBA")
 
         by = base_image.size[1]
-        resized_number_image = number_image.resize((by, by), Image.Resampling.LANCZOS)
+        resized_number_image = number_image.resize(
+            (by, by), Image.Resampling.LANCZOS)
 
         bx_center = base_image.size[0] // 2
         position = (bx_center - by // 2, 0)
@@ -503,7 +550,8 @@ class SelectionPage(tk.Frame):
         selected_images = self.controller.frames[SelectionPage].selected_ordered_images
         for idx, selected_image in enumerate(selected_images):
             image = Image.open(selected_image)
-            rect = [(217, 66), (634, 343), (646, 66), (1063, 343), (217, 355), (634, 632), (646, 355), (1063, 632)][idx]
+            rect = [(217, 66), (634, 343), (646, 66), (1063, 343),
+                    (217, 355), (634, 632), (646, 355), (1063, 632)][idx]
             size = (417, 277)
             image = image.resize(size)
             main_image.paste(image, rect[0])
