@@ -378,42 +378,40 @@ class SelectionPage(tk.Frame):
         tk.Frame.__init__(self, parent)
         self.controller = controller
         self.selected_image_path = None
-        self.selected_image_index = None  # 선택된 이미지 인덱스를 위한 속성 추가
+        self.selected_image_index = None
         self.image_labels = []
         self.selected_images = []
-        self.selected_ordered_images = []  # 선택된 이미지의 경로를 순서대로 저장
+        self.selected_ordered_images = []
 
-        # 초기 숫자 이미지 목록
         self.initial_number_images = [current_path + '\\assets\\01.png', current_path + '\\assets\\02.png',
                                       current_path + '\\assets\\03.png', current_path + '\\assets\\04.png']
         self.available_number_images = self.initial_number_images.copy()
         self.image_selection_status = {}
 
+        self.print_button = tk.Button(self, text="인쇄", height=3, width=10,
+                                      font=("Helvetica", 20), command=self.print_image,
+                                      state=tk.DISABLED)
+        self.print_button.pack(side="bottom", pady=20)
+
     def on_show_frame(self):
-        # 이전에 생성된 이미지 라벨들을 제거합니다.
         for label in self.image_labels:
             label.destroy()
-            self.image_labels.clear()
-
-        # 새로운 이미지 라벨들을 생성합니다.
+        self.image_labels.clear()
         self.create_widgets()
 
-    # 촬영한 사진 보여주는 함수
     def create_widgets(self):
-        # 이미지를 담을 새로운 프레임 생성
         images_container = tk.Frame(self)
         images_container.pack(side="top", expand=True)
 
         images_frame_top = tk.Frame(images_container)
         images_frame_top.pack(side="top", expand=True)
 
-        # 간격 조절을 위해 pady 값을 조정
         images_frame_bottom = tk.Frame(images_container)
         images_frame_bottom.pack(side="top", expand=True, pady=5)
 
         image_files = sorted(self.controller.captured_images,
                             key=lambda f: os.path.basename(f))
-        print(image_files)  # 파일 경로 출력
+        print(image_files)
 
         self.image_labels = []
         for idx, file in enumerate(image_files):
@@ -421,8 +419,7 @@ class SelectionPage(tk.Frame):
                 img = Image.open(file)
                 img.thumbnail((320, 180))
                 photo = ImageTk.PhotoImage(img)
-                
-                # 상단 프레임 또는 하단 프레임에 이미지 라벨 추가
+
                 if idx < 3:
                     parent_frame = images_frame_top
                 else:
@@ -430,49 +427,36 @@ class SelectionPage(tk.Frame):
 
                 label = tk.Label(parent_frame, image=photo)
                 label.image = photo
-                label.index = idx  # 라벨에 인덱스 저장
-                
-                # lambda 함수에 idx 인자 추가
+                label.index = idx
                 label.bind("<Button-1>", lambda e, idx=idx, file=file: self.select_image(idx, file))
-
                 label.pack(side="left", padx=10)
                 self.image_labels.append(label)
             except Exception as e:
                 print(f"Error loading image {file}: {e}")
 
-        # '인쇄' 버튼 생성 및 이벤트 바인딩
-        self.print_button = tk.Button(self, text="인쇄", height=3, width=10,
-                                      font=("Helvetica", 20), command=self.print_image)
-        self.print_button.pack(side="bottom", pady=20)
-
     def select_image(self, selected_index, clicked_image_path):
         if clicked_image_path in self.image_selection_status and self.image_selection_status[clicked_image_path]:
-            # 이미 선택된 이미지를 클릭한 경우, 선택 해제
             self.remove_overlay(selected_index, clicked_image_path)
             used_number_image = self.image_selection_status[clicked_image_path]
-            self.available_number_images.append(used_number_image)  # 숫자 이미지를 사용 가능한 목록에 추가
-            self.available_number_images.sort(key=lambda x: self.initial_number_images.index(x))  # 목록을 초기 순서대로 정렬
+            self.available_number_images.append(used_number_image)
+            self.available_number_images.sort(key=lambda x: self.initial_number_images.index(x))
             self.image_selection_status[clicked_image_path] = None
             self.selected_ordered_images.remove(clicked_image_path)
-
         else:
-            # 새로운 이미지를 선택한 경우
             if self.available_number_images:
-                number_image_path = self.available_number_images.pop(0)  # 사용 가능한 첫 번째 숫자 이미지 가져오기
+                number_image_path = self.available_number_images.pop(0)
                 overlaid_image = self.overlay_number_on_image(clicked_image_path, number_image_path)
                 self.update_image_label(selected_index, overlaid_image)
                 self.selected_images.append(clicked_image_path)
                 self.image_selection_status[clicked_image_path] = number_image_path
                 self.selected_ordered_images.append(clicked_image_path)
 
-    def insert_number_image_in_order(self, number_image_path):
-        # 숫자 이미지를 원래 순서에 맞게 목록에 다시 삽입
-        index = self.initial_number_images.index(number_image_path)
-        if number_image_path not in self.available_number_images:
-            self.available_number_images.insert(index, number_image_path)
+        if len(self.selected_ordered_images) == 4:
+            self.print_button.config(state=tk.NORMAL)
+        else:
+            self.print_button.config(state=tk.DISABLED)
 
     def remove_overlay(self, index, image_path):
-        # 오버레이된 숫자를 제거하고 원본 이미지를 다시 로드합니다.
         original_image = Image.open(image_path)
         original_image.thumbnail((320, 180))
         photo = ImageTk.PhotoImage(original_image)
@@ -481,20 +465,15 @@ class SelectionPage(tk.Frame):
         label.image = photo
 
     def overlay_number_on_image(self, base_image_path, number_image_path):
-        # 기본 이미지와 숫자 이미지를 엽니다.
         base_image = Image.open(base_image_path).convert("RGBA")
         number_image = Image.open(number_image_path).convert("RGBA")
 
-        # 기본 이미지의 세로 길이를 기준으로 숫자 이미지 크기를 정사각형으로 조정합니다.
         by = base_image.size[1]
         resized_number_image = number_image.resize((by, by), Image.Resampling.LANCZOS)
 
-        # 오버레이할 위치를 계산합니다.
-        # 기본 이미지의 중간에 숫자 이미지를 오버레이하려면 위치를 조정해야 합니다.
         bx_center = base_image.size[0] // 2
-        position = (bx_center - by // 2, 0)  # x 위치는 중앙, y 위치는 상단
+        position = (bx_center - by // 2, 0)
 
-        # 오버레이된 이미지를 생성합니다.
         overlaid_image = Image.new("RGBA", base_image.size)
         overlaid_image.paste(base_image, (0, 0))
         overlaid_image.alpha_composite(resized_number_image, position)
@@ -502,24 +481,15 @@ class SelectionPage(tk.Frame):
         return overlaid_image
 
     def update_image_label(self, index, overlaid_image):
-        # 고정된 크기로 이미지를 조정합니다.
         resized_image = overlaid_image.resize((320, 180))
-
-        # 이미지 라벨을 업데이트합니다.
         photo = ImageTk.PhotoImage(resized_image)
-
-        # 해당 인덱스의 라벨을 찾아 업데이트합니다.
         label = self.image_labels[index]
         label.configure(image=photo)
         label.image = photo
 
     def print_image(self):
-        if self.selected_image_path is not None:
-            print(f"인쇄할 이미지: {self.selected_image_path}")
-
-            # 인쇄 명령
+        if len(self.selected_ordered_images) == 4:
             self.print_to_printer("Canon SELPHY CP1300 WS")
-
             self.delete_all_images()
         else:
             print("선택된 이미지가 없습니다.")
@@ -528,19 +498,16 @@ class SelectionPage(tk.Frame):
         global current_path
         hprinter = win32print.OpenPrinter(printer_name)
 
-        # mainimage.png를 엽니다.
         main_image = Image.open(current_path + "\\main_image.png")
 
-        # 선택된 이미지 순서대로 파일명 결정
         selected_images = self.controller.frames[SelectionPage].selected_ordered_images
         for idx, selected_image in enumerate(selected_images):
             image = Image.open(selected_image)
             rect = [(217, 66), (634, 343), (646, 66), (1063, 343), (217, 355), (634, 632), (646, 355), (1063, 632)][idx]
-            size = (417, 277)  # 조정할 이미지 크기
+            size = (417, 277)
             image = image.resize(size)
-            main_image.paste(image, rect[0])  # 선택된 이미지를 mainimage.png 위에 얹습니다.
+            main_image.paste(image, rect[0])
 
-        # 결과 이미지를 저장합니다.
         main_image.save(current_path + "\\images\\result.png")
 
         try:
@@ -560,7 +527,6 @@ class SelectionPage(tk.Frame):
             hDC.EndPage()
             hDC.EndDoc()
             hDC.DeleteDC()
-
         finally:
             win32print.ClosePrinter(hprinter)
 
