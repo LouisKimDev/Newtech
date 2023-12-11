@@ -291,28 +291,61 @@ class PhotoPage(tk.Frame):
                              key=os.path.getmtime, reverse=True)[:6]
         self.controller.captured_images = image_files
 
-    # 키보드 입력 감지해서 화면 캡쳐
+    # 키보드 입력 감지해서 화면 캡쳐 및 크로마키 처리
     def on_press(self, key):
         global current_path
         audio_file = current_path + "\\assets\\shutter_sound.mp3"
+        background_image_path = current_path + "\\assets\\new_background.jpg"  # 새 배경 이미지 파일 경로
 
         if str(key) == "Key.enter":
             sound = pygame.mixer.Sound(audio_file)
             sound.play()
-            save_directory = current_path + "\\images"  # 여기에 저장할 디렉토리 경로를 지정하세요
+            save_directory = current_path + "\\images"
             current_datetime = datetime.datetime.now()
             filename = current_datetime.strftime(f"{self.imgCount+1}.png")
             file_path = os.path.join(save_directory, filename)
+
             # 카메라에서 현재 프레임 캡처
             ret, frame = self.camera.read()
             if ret:
+                # 크로마키 처리
+                frame = self.apply_chroma_key(frame, background_image_path)
+                    #background_image_path 에 크로마키 입힐 사진(보라색)을 넣어야 함
+
                 # 지정한 경로에 이미지 저장
                 cv2.imwrite(file_path, frame)
                 print("이미지가 저장되었습니다:", file_path)
-                self.imgCount += 1   # 촬영한 사진 횟수 증가
-                if self.imgCount >= 6:  # 여섯 장째 촬영했을 경우, 다음 화면으로 이동(사진 선택)
+                self.imgCount += 1
+                if self.imgCount >= 6:
                     self.update_captured_images_list()
                     self.controller.show_frame(SelectionPage)
+
+    # 크로마키 처리 함수
+    def apply_chroma_key(self, frame, background_image_path):
+        # 배경 이미지 불러오기
+        background = cv2.imread(background_image_path)
+        background = cv2.resize(background, (frame.shape[1], frame.shape[0]))
+
+        # 초록색 범위 정의
+        lower_green = np.array([40, 40, 40])
+        upper_green = np.array([70, 255, 255])
+
+        # HSV 색상 공간으로 변환
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+        # 초록색 마스크 생성
+        mask = cv2.inRange(hsv, lower_green, upper_green)
+
+        # 마스크 반전 (초록색이 아닌 부분을 선택)
+        mask_inv = cv2.bitwise_not(mask)
+
+        # 전경 이미지에서 초록색 제외
+        foreground = cv2.bitwise_and(frame, frame, mask=mask_inv)
+
+        # 배경 이미지에 전경 이미지 병합
+        result = cv2.bitwise_or(background, foreground)
+
+        return result
 
     def update(self):
         # 비디오 프레임 업데이트 함수
