@@ -338,7 +338,7 @@ class PhotoPage(tk.Frame):
     def on_press(self, key):
         global current_path
         audio_file = current_path + "\\assets\\shutter_sound.mp3"
-        background_image_path = current_path + "\\assets\\new_background.jpg"  # 새 배경 이미지 파일 경로
+        background_image_path = current_path + "\\assets\\chroma_key.jpg"  # 새 배경 이미지 파일 경로
 
         if str(key) == "Key.enter":
             sound = pygame.mixer.Sound(audio_file)
@@ -364,14 +364,15 @@ class PhotoPage(tk.Frame):
                     self.controller.show_frame(SelectionPage)
 
     # 크로마키 처리 함수
+    # 크로마키 처리 함수
     def apply_chroma_key(self, frame, background_image_path):
         # 배경 이미지 불러오기
         background = cv2.imread(background_image_path)
         background = cv2.resize(background, (frame.shape[1], frame.shape[0]))
 
-        # 초록색 범위 정의
-        lower_green = np.array([40, 40, 40])
-        upper_green = np.array([70, 255, 255])
+        # 초록색의 HSV 범위 정의
+        lower_green = np.array([36, 25, 25])
+        upper_green = np.array([86, 255,255])
 
         # HSV 색상 공간으로 변환
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -380,13 +381,19 @@ class PhotoPage(tk.Frame):
         mask = cv2.inRange(hsv, lower_green, upper_green)
 
         # 마스크 반전 (초록색이 아닌 부분을 선택)
-        mask_inv = cv2.bitwise_not(mask)
+        kernel = np.ones((5, 5), np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
-        # 전경 이미지에서 초록색 제외
+        # 마스크된 영역에서 크로마키 천의 영역만 배경 이미지로 대체
+        background_applied = cv2.bitwise_and(background, background, mask=mask)
+
+        # 마스크를 반전시켜 나머지 영역에는 원본 프레임을 유지
+        mask_inv = cv2.bitwise_not(mask)
         foreground = cv2.bitwise_and(frame, frame, mask=mask_inv)
 
-        # 배경 이미지에 전경 이미지 병합
-        result = cv2.bitwise_or(background, foreground)
+        # 마스크된 배경과 원본 프레임의 나머지 영역을 합성
+        result = cv2.bitwise_or(background_applied, foreground)
 
         return result
 
