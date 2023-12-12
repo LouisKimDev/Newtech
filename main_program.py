@@ -77,7 +77,7 @@ class StartPage(ttk.Frame):
             "--img-size", "640",
             "--source", "1"
         ]
-        # subprocess.run([yolopath] + yolocommand)
+        subprocess.run([yolopath] + yolocommand)
         global person_check
         file_path = current_path + "\\person_count.txt"
         with open(file_path, "r") as file:
@@ -371,7 +371,11 @@ class PhotoPage(tk.Frame):
         background = cv2.resize(background, (frame.shape[1], frame.shape[0]))
 
         # 초록색의 HSV 범위 정의
+<<<<<<< HEAD
         lower_green = np.array([36, 25, 25])
+=======
+        lower_green = np.array([35, 50, 50])
+>>>>>>> dev
         upper_green = np.array([86, 255,255])
 
         # HSV 색상 공간으로 변환
@@ -617,9 +621,6 @@ class SelectionPage(tk.Frame):
 
         for idx, selected_image in enumerate(selected_images):
             image = Image.open(selected_image)
-            rect = [(217, 66), (634, 343), (646, 66), (1063, 343),
-                    (217, 355), (634, 632), (646, 355), (1063, 632)][idx]
-            size = (417, 277)
             image = image.resize(size)
             main_image.paste(image, rects[idx])  # rects 리스트에서 위치를 가져옵니다.
 
