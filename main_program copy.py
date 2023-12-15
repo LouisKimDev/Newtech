@@ -277,14 +277,12 @@ class PoseRecommandPage(tk.Frame):
     def on_button_click(self, path):
         if path not in self.selected_images:
             self.selected_images.append(path)
-            self.controller.frames[PhotoPage].selected_poses.append(
-                self.selected_images)
+            # 여기서 selected_images 리스트의 복사본을 PhotoPage의 selected_poses에 할당
+            self.controller.frames[PhotoPage].selected_poses = self.selected_images.copy()
             print(f"{path} 버튼이 클릭됨")
 
-        if len(self.selected_images) == 6:  # 포즈 6개 선택
-            # print("선택된 이미지 경로: ", self.selected_images)
-            # print("photopage의 selected poses: ",
-            #       self.controller.frames[PhotoPage].selected_poses)
+        # 포즈 6개 선택 시 PhotoPage로 이동
+        if len(self.selected_images) == 6:
             self.controller.show_frame(PhotoPage)
 
 
@@ -404,23 +402,26 @@ class PhotoPage(tk.Frame):
             # OpenCV 프레임을 RGB로 변환
             frame = cv2.cvtColor(np.array(frame), cv2.COLOR_BGR2RGB)
 
-            # 선택된 포즈 이미지를 캡쳐한 프레임에 차례로 bitwise_or 연산 수행
+            # 선택된 포즈 이미지를 캡쳐한 프레임에 차례로 오버레이
             try:
-                if len(self.selected_poses) >= 6:   # 포즈 3개 선택 -> 6개로 수정
-                    pose_image = cv2.imread(
-                        self.selected_poses[0][self.imgCount])
-                    pose_image = cv2.resize(
-                        pose_image, (1920, 1080))  # 웹캠 프레임 크기에 맞게 조절
-                    frame = cv2.bitwise_or(frame, pose_image)
-            except:
-                pass
+                if self.imgCount < len(self.selected_poses):
+                    pose_image_path = self.selected_poses[self.imgCount]
+                    pose_image = cv2.imread(pose_image_path)
+                    
+                    # 웹캠 프레임 크기 확인
+                    frame_height, frame_width = frame.shape[:2]
+                    # 오버레이 이미지 크기를 웹캠 프레임 크기에 맞게 조절
+                    pose_image = cv2.resize(pose_image, (frame_width, frame_height))
+                    
+                    # bitwise_or 연산으로 오버레이 적용
+                    frame = cv2.addWeighted(frame, 1, pose_image, 0.5, 0)
+            except Exception as e:
+                print(f"오버레이 이미지 적용 중 오류 발생: {e}")
 
             frame = cv2.flip(frame, 1)
 
             # frame을 Tkinter 이미지로 변환 및 참조 저장
-            self.photo = ImageTk.PhotoImage(
-                image=Image.fromarray(frame)
-            )
+            self.photo = ImageTk.PhotoImage(image=Image.fromarray(frame))
 
             # 캔버스에 이미지 표시
             self.canvas.create_image(0, 0, image=self.photo, anchor=tk.NW)
